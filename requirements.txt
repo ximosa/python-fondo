@@ -1,6 +1,6 @@
 streamlit
 google-cloud-texttospeech
-moviepy==1.0.3
+moviepy
 Pillow
 numpy
 requests
