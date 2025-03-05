@@ -4,5 +4,3 @@ moviepy
 Pillow
 numpy
 requests
-imageio-ffmpeg==0.4.9
-nltk
