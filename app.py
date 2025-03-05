@@ -19,13 +19,11 @@ from io import BytesIO
 
 logging.basicConfig(level=logging.INFO)
 
-# Cargar credenciales de GCP desde secrets (si estás en Streamlit Cloud)
-# Si estás corriendo localmente, puedes comentar estas líneas y usar tu archivo JSON directamente
-
-credentials = dict(st.secrets["gcp_service_account"])  # Corregido: Usar corchetes
-with open("google_credentials.json", "w") as f:
-    json.dump(credentials, f)
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_credentials.json"
+# Cargar credenciales de GCP. Comentado para ejecución local, descomentar para Streamlit Cloud.
+# credentials = dict(st.secrets["gcp_service_account"])
+# with open("google_credentials.json", "w") as f:
+#     json.dump(credentials, f)
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_credentials.json"
 
 
 # Configuración de voces
@@ -38,7 +36,7 @@ VOCES_DISPONIBLES = {
 def create_text_image(text, size=(1280, 360), font_size=30, line_height=40):
     img = Image.new('RGB', size, 'black')
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)  # O cualquier otra fuente
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size) # Asegúrate de que la ruta sea correcta
 
     words = text.split()
     lines = []
@@ -156,7 +154,7 @@ def create_simple_video(texto, nombre_salida, voz, video_fondo):
             clips_finales.append(video_segment)
 
             tiempo_acumulado += duracion
-            time.sleep(0.2)  # Pequeña pausa para evitar problemas
+            time.sleep(0.2)  # Pequeña pausa
 
         # Cargar el video de fondo
         video_fondo_clip = VideoFileClip(video_fondo)
@@ -183,7 +181,7 @@ def create_simple_video(texto, nombre_salida, voz, video_fondo):
         if video_fondo_clip:
             video_fondo_clip.close()
 
-        # Limpieza de archivos temporales (más robusta)
+        # Limpieza de archivos temporales
         for temp_file in archivos_temp:
             try:
                 if os.path.exists(temp_file):
@@ -196,28 +194,28 @@ def create_simple_video(texto, nombre_salida, voz, video_fondo):
     except Exception as e:
         logging.error(f"Error en create_simple_video: {str(e)}")
 
-        # Limpieza en caso de error (más robusta)
+        # Limpieza en caso de error
         for clip in clips_audio:
             try:
                 clip.close()
-            except Exception as close_err:
-                logging.error(f"Error al cerrar clip de audio: {close_err}")
+            except:
+                pass
         for clip in clips_finales:
             try:
                 clip.close()
-            except Exception as close_err:
-                logging.error(f"Error al cerrar clip final: {close_err}")
+            except:
+                pass
         if video_fondo_clip:
             try:
                 video_fondo_clip.close()
-            except Exception as close_err:
-                 logging.error(f"Error al cerrar video de fondo: {close_err}")
+            except:
+                pass
         for temp_file in archivos_temp:
             try:
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
-            except Exception as remove_err:
-                logging.error(f"Error al eliminar archivo temporal {temp_file}: {remove_err}")
+            except:
+                pass
 
         return False, str(e)
 
@@ -246,11 +244,11 @@ def main():
                     st.video(nombre_salida_completo)
                     with open(nombre_salida_completo, 'rb') as file:
                         st.download_button(label="Descargar video", data=file, file_name=nombre_salida_completo)
-                    st.session_state.video_path = nombre_salida_completo  # Guardar en session_state
+                    st.session_state.video_path = nombre_salida_completo
                 else:
                     st.error(f"Error al generar video: {message}")
 
-            os.unlink(temp_video_path)  # Eliminar el archivo temporal
+            os.unlink(temp_video_path)
 
 if __name__ == "__main__":
     if "video_path" not in st.session_state:
