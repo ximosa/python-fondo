@@ -31,20 +31,6 @@ VOCES_DISPONIBLES = {
 
 # Función de creación de texto con fondo
 def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white"):
-    """
-    Crea una imagen con texto y un fondo oscuro transparente.
-
-    Args:
-        text: El texto a mostrar.
-        size: El tamaño de la imagen (ancho, alto).
-        font_size: El tamaño de la fuente.
-        line_height: La altura de cada línea de texto.
-        bg_color: El color de fondo en formato RGBA (rojo, verde, azul, alfa).
-        text_color: El color del texto.
-
-    Returns:
-        Un array NumPy que representa la imagen.
-    """
     img = Image.new('RGBA', size, (0, 0, 0, 0))  # Fondo totalmente transparente
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
@@ -87,9 +73,10 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
     archivos_temp = []
     clips_audio = []
     clips_finales = []
-    success = False  # Inicializa success
-    message = ""  # Inicializa message
+    success = False
+    message = ""
     temp_video_path = None
+    background_clip = None
 
     try:
         logging.info("Iniciando proceso de creación de video...")
@@ -97,28 +84,19 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         client = texttospeech.TextToSpeechClient()
 
         tiempo_acumulado = 0
-
+        
         # Agrupamos frases en segmentos
         segmentos_texto = []
         segmento_actual = ""
         for frase in frases:
-            if len(segmento_actual) + len(frase) < 300:
-                segmento_actual += " " + frase
-            else:
-                segmentos_texto.append(segmento_actual.strip())
-                segmento_actual = frase
+          if len(segmento_actual) + len(frase) < 300:
+            segmento_actual += " " + frase
+          else:
+            segmentos_texto.append(segmento_actual.strip())
+            segmento_actual = frase
         segmentos_texto.append(segmento_actual.strip())
 
-        # Cargar video de fondo
-        try:
-            logging.info(f"Intentando cargar video de fondo desde: {background_video_path}")
-            background_clip = VideoFileClip(background_video_path, audio=False)
-            logging.info("Video de fondo cargado exitosamente.")
-        except Exception as e:
-            message = f"Error al cargar el video de fondo: {e}"
-            logging.error(message)
-            return False, message, None
-
+        # Generar audio y calcular la duración total
         for i, segmento in enumerate(segmentos_texto):
             logging.info(f"Procesando segmento {i + 1} de {len(segmentos_texto)}")
 
@@ -152,7 +130,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
                         raise
 
             if retry_count > max_retries:
-                raise Exception("Maximos intentos de reintento alcanzado")
+                raise Exception("Máximos intentos de reintento alcanzado")
 
             temp_filename = f"temp_audio_{i}.mp3"
             archivos_temp.append(temp_filename)
@@ -162,43 +140,44 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             audio_clip = AudioFileClip(temp_filename)
             clips_audio.append(audio_clip)
             duracion = audio_clip.duration
-
-            # Usar la función create_text_image modificada
+            
             text_img = create_text_image(segmento)
-            txt_clip = (ImageClip(text_img, transparent=True)  # Hace el fondo transparente
-                        .set_start(tiempo_acumulado)
-                        .set_duration(duracion)
-                        .set_position('center'))
-
+            txt_clip = (ImageClip(text_img, transparent=True)  #Hace el fondo transparente
+                      .set_start(tiempo_acumulado)
+                      .set_duration(duracion)
+                      .set_position('center'))
+            
             video_segment = txt_clip.set_audio(audio_clip.set_start(tiempo_acumulado))
             clips_finales.append(video_segment)
 
             tiempo_acumulado += duracion
             time.sleep(0.2)
 
-        # Calcular la duración total del video
-        video_duration = tiempo_acumulado
+        video_duration = tiempo_acumulado  # Duración total del video
 
-        # Calcular cuántas veces necesitamos repetir el clip de fondo
-        num_loops = int(video_duration / background_clip.duration) + 1
+        # Cargar video de fondo
+        try:
+            logging.info(f"Intentando cargar video de fondo desde: {background_video_path}")
+            background_clip = VideoFileClip(background_video_path, audio=False)
+            logging.info("Video de fondo cargado exitosamente.")
 
-        # Crear una lista de clips de fondo repetidos
-        background_clips = [background_clip] * num_loops
+            # Recortar el video de fondo solo si es más largo que la duración del texto
+            if background_clip.duration > video_duration:
+                background_clip = background_clip.subclip(0, video_duration)
 
-        # Concatenar los clips de fondo
-        background_clip_repeated = concatenate_videoclips(background_clips, method="compose")
-
-        # Ajustar el clip de fondo para que coincida con la duración total del video
-        background_clip = background_clip_repeated.subclip(0, video_duration)
+        except Exception as e:
+            message = f"Error al cargar/procesar el video de fondo: {e}"
+            logging.error(message)
+            return False, message, None
 
         # Superponer los clips de texto sobre el fondo
-        final_video_with_background = CompositeVideoClip([background_clip] + clips_finales)
+        final_video = concatenate_videoclips([background_clip] + clips_finales, method="compose")
 
         # Generar el video en un archivo temporal
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_video_file:
             temp_video_path = temp_video_file.name
             logging.info(f"Escribiendo video a archivo temporal: {temp_video_path}")
-            final_video_with_background.write_videofile(
+            final_video.write_videofile(
                 temp_video_path,
                 fps=24,
                 codec='libx264',
@@ -230,8 +209,10 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
                 pass
 
         try:
-            background_clip.close()
-            background_clip_repeated.close()
+            if background_clip:
+                background_clip.close()
+            if final_video:
+                final_video.close()
         except:
             pass
 
