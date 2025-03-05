@@ -141,11 +141,17 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         # Calcular la duración total del video
         video_duration = tiempo_acumulado
 
-        # Crear el clip de fondo repetido
-        loop_duration = video_duration  # La duración del loop es la duración total del video
+        # Calcular cuántas veces necesitamos repetir el clip de fondo
+        num_loops = int(video_duration / background_clip.duration) + 1
+
+        # Crear una lista de clips de fondo repetidos
+        background_clips = [background_clip] * num_loops
+
+        # Concatenar los clips de fondo
+        background_clip_repeated = concatenate_videoclips(background_clips, method="compose")
 
         # Ajustar el clip de fondo para que coincida con la duración total del video
-        background_clip = background_clip.loop(n_loops=int(video_duration / background_clip.duration) + 1).subclip(0, video_duration)
+        background_clip = background_clip_repeated.subclip(0, video_duration)
 
         # Superponer los clips de texto sobre el fondo
         final_video_with_background = CompositeVideoClip([background_clip] + clips_finales)
@@ -160,7 +166,8 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         )
         
         final_video_with_background.close()
-        background_clip.close()
+        background_clip_repeated.close()  # Cerrar el clip concatenado
+        background_clip.close() #Cerrar el clip original
         
         for clip in clips_audio:
             clip.close()
