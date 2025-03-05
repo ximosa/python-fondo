@@ -14,16 +14,21 @@ from io import BytesIO
 logging.basicConfig(level=logging.INFO)
 
 # Cargar credenciales de GCP desde secrets
-credentials = dict(st.secrets.gcp_service_account)
-with open("google_credentials.json", "w") as f:
-    json.dump(credentials, f)
+try:
+    credentials = dict(st.secrets.gcp_service_account)
+    with open("google_credentials.json", "w") as f:
+        json.dump(credentials, f)
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_credentials.json"
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_credentials.json"
+except Exception as e:
+    st.error(f"Error al cargar las credenciales de GCP: {e}")
+    st.stop()
 
 # Configuración de voces
 VOCES_DISPONIBLES = {
     'es-ES-Standard-B': texttospeech.SsmlVoiceGender.MALE,
 }
+
 # Función de creación de texto
 def create_text_image(text, size=(1280, 360), font_size=30, line_height=40):
     img = Image.new('RGBA', size, (0,0,0,0)) # Fondo transparente
@@ -60,7 +65,9 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
     archivos_temp = []
     clips_audio = []
     clips_finales = []
-    
+    success = False # Inicializa success
+    message = "" # Inicializa message
+
     try:
         logging.info("Iniciando proceso de creación de video...")
         frases = [f.strip() + "." for f in texto.split('.') if f.strip()]
@@ -80,7 +87,10 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         segmentos_texto.append(segmento_actual.strip())
         
         # Cargar video de fondo
-        background_clip = VideoFileClip(background_video_path, audio=False)
+        try:
+            background_clip = VideoFileClip(background_video_path, audio=False)
+        except Exception as e:
+            raise Exception(f"Error al cargar el video de fondo: {e}")
         
         for i, segmento in enumerate(segmentos_texto):
             logging.info(f"Procesando segmento {i+1} de {len(segmentos_texto)}")
@@ -155,25 +165,46 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
 
         # Superponer los clips de texto sobre el fondo
         final_video_with_background = CompositeVideoClip([background_clip] + clips_finales)
-        
-        final_video_with_background.write_videofile(
-            nombre_salida,
-            fps=24,
-            codec='libx264',
-            audio_codec='aac',
-            preset='ultrafast',
-            threads=4
-        )
-        
-        final_video_with_background.close()
-        background_clip_repeated.close()  # Cerrar el clip concatenado
-        background_clip.close() #Cerrar el clip original
-        
+
+        # Generar el video en un archivo temporal
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_video_file:
+            temp_video_path = temp_video_file.name
+            final_video_with_background.write_videofile(
+                temp_video_path,
+                fps=24,
+                codec='libx264',
+                audio_codec='aac',
+                preset='ultrafast',
+                threads=4
+            )
+
+        success = True
+        message = "Video generado exitosamente"
+        return success, message, temp_video_path  # Devuelve la ruta al archivo temporal
+
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        message = str(e)
+        return False, message, None
+
+    finally: # Asegura que los recursos se liberen incluso si hay errores
         for clip in clips_audio:
-            clip.close()
-        
+            try:
+                clip.close()
+            except:
+                pass
+                
         for clip in clips_finales:
-            clip.close()
+            try:
+                clip.close()
+            except:
+                pass
+
+        try:
+            background_clip.close()
+            background_clip_repeated.close()
+        except:
+            pass
             
         for temp_file in archivos_temp:
             try:
@@ -182,33 +213,6 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
                     os.remove(temp_file)
             except:
                 pass
-        
-        return True, "Video generado exitosamente"
-        
-    except Exception as e:
-        logging.error(f"Error: {str(e)}")
-        for clip in clips_audio:
-            try:
-                clip.close()
-            except:
-                pass
-                
-        for clip in clips_finales:
-            try:
-                clip.close()
-            except:
-                pass
-                
-        for temp_file in archivos_temp:
-            try:
-                if os.path.exists(temp_file):
-                    os.close(os.open(temp_file, os.O_RDONLY))
-                    os.remove(temp_file)
-            except:
-                pass
-        
-        return False, str(e)
-
 
 def main():
     st.title("Creador de Videos Automático")
@@ -222,23 +226,26 @@ def main():
         nombre_salida = st.text_input("Nombre del Video (sin extensión)", "video_generado")
         
         # Guardar el video de fondo temporalmente
-        temp_dir = tempfile.TemporaryDirectory()
-        background_video_path = os.path.join(temp_dir.name, "background.mp4")
-        with open(background_video_path, "wb") as f:
-            f.write(background_video.read())
-        
-        if st.button("Generar Video"):
-            with st.spinner('Generando video...'):
-                nombre_salida_completo = f"{nombre_salida}.mp4"
-                success, message = create_simple_video(texto, nombre_salida_completo, voz_seleccionada, background_video_path)
-                if success:
-                  st.success(message)
-                  st.video(nombre_salida_completo)
-                  with open(nombre_salida_completo, 'rb') as file:
-                    st.download_button(label="Descargar video",data=file,file_name=nombre_salida_completo)
-
-                else:
-                  st.error(f"Error al generar video: {message}")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            background_video_path = os.path.join(temp_dir, "background.mp4")
+            with open(background_video_path, "wb") as f:
+                f.write(background_video.read())
+            
+            if st.button("Generar Video"):
+                with st.spinner('Generando video...'):
+                    success, message, temp_video_path = create_simple_video(texto, nombre_salida, voz_seleccionada, background_video_path)
+                    if success:
+                        st.success(message)
+                        try:
+                            with open(temp_video_path, 'rb') as file:
+                                st.video(file) # Muestra el video directamente desde el archivo temporal
+                                st.download_button(label="Descargar video", data=file, file_name=f"{nombre_salida}.mp4")
+                        except Exception as e:
+                            st.error(f"Error al mostrar/descargar el video: {e}")
+                        finally:
+                            os.remove(temp_video_path) # Elimina el archivo temporal después de mostrarlo/descargarlo
+                    else:
+                        st.error(f"Error al generar video: {message}")
 
 if __name__ == "__main__":
     main()
