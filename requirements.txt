@@ -1,6 +1,1 @@
-streamlit
-google-cloud-texttospeech
-moviepy>=1.0.3  # Como mínimo, pero recomiendo la última
-Pillow>=9.0.0   # Versión compatible con moviepy, pero recomiendo la última
-numpy
-requests
+moviepy
