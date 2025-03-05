@@ -30,7 +30,7 @@ VOCES_DISPONIBLES = {
 }
 
 # Función de creación de texto con fondo
-def create_text_image(text, size=(1280, 360), font_size=60, line_height=70, bg_color=(0, 0, 0, 128), text_color="white"):
+def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white"):
     """
     Crea una imagen con texto y un fondo oscuro transparente.
 
