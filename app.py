@@ -30,7 +30,7 @@ VOCES_DISPONIBLES = {
 }
 
 # Función de creación de texto con fondo
-def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white"):
+def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white", padding=10):
     """
     Crea una imagen con texto y un fondo oscuro transparente.
 
@@ -41,6 +41,7 @@ def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_c
         line_height: La altura de cada línea de texto.
         bg_color: El color de fondo en formato RGBA (rojo, verde, azul, alfa).
         text_color: El color del texto.
+        padding: El padding alrededor del texto en píxeles.
 
     Returns:
         Un array NumPy que representa la imagen.
@@ -57,24 +58,25 @@ def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_c
         current_line.append(word)
         test_line = ' '.join(current_line)
         left, top, right, bottom = draw.textbbox((0, 0), test_line, font=font)
-        if right > size[0] - 60:
+        if right > size[0] - (2 * padding):
             current_line.pop()
             lines.append(' '.join(current_line))
             current_line = [word]
     lines.append(' '.join(current_line))
 
     total_height = len(lines) * line_height
-    y = (size[1] - total_height) // 2
+    # Calculate the starting Y position to place the text at the bottom
+    y = size[1] - total_height - (2 * padding) # Moves the text to the bottom
 
     for line in lines:
         left, top, right, bottom = draw.textbbox((0, 0), line, font=font)
         x = (size[0] - (right - left)) // 2
 
         # Dibujar el rectángulo de fondo
-        rect_x0 = x - 10  # Margen horizontal
-        rect_y0 = y - 10  # Margen vertical
-        rect_x1 = x + (right - left) + 10
-        rect_y1 = y + line_height - 10
+        rect_x0 = x - padding  # Margen horizontal
+        rect_y0 = y - padding  # Margen vertical
+        rect_x1 = x + (right - left) + padding
+        rect_y1 = y + line_height - padding
         draw.rectangle((rect_x0, rect_y0, rect_x1, rect_y1), fill=bg_color)
 
         draw.text((x, y), line, font=font, fill=text_color)
@@ -168,7 +170,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             txt_clip = (ImageClip(text_img, transparent=True)  # Hace el fondo transparente
                         .set_start(tiempo_acumulado)
                         .set_duration(duracion)
-                        .set_position('center'))
+                        .set_position('bottom')) # Move the text to the bottom of the video
 
             video_segment = txt_clip.set_audio(audio_clip.set_start(tiempo_acumulado))
             clips_finales.append(video_segment)
