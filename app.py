@@ -33,57 +33,45 @@ VOCES_DISPONIBLES = {
 def create_text_image(text, video_width, font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white", padding=10, bottom_margin=20):
     """
     Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
-
-    Args:
-        text: El texto a mostrar.
-        video_width: Ancho del video de fondo.  Importante para el ancho de la imagen.
-        font_size: El tamaño de la fuente.
-        line_height: La altura de cada línea de texto.
-        bg_color: El color de fondo en formato RGBA (rojo, verde, azul, alfa).
-        text_color: El color del texto.
-        padding: El padding alrededor del texto en píxeles.
-        bottom_margin: Margen desde la parte inferior del video.
-
-    Returns:
-        Un array NumPy que representa la imagen.
+    El fondo ahora cubre todo el bloque de texto.
     """
-    # Envolver el texto para que quepa dentro del ancho del video
     import textwrap
-    wrapped_text = textwrap.fill(text, width=60)  # Ajusta 'width' para controlar el ancho máximo del texto
+    wrapped_text = textwrap.fill(text, width=60)
     lines = wrapped_text.split('\n')
     num_lines = len(lines)
 
     # Calcula la altura total requerida para el texto
     total_text_height = num_lines * line_height
-
-    # Calcula la altura total de la imagen (incluyendo padding y margen inferior)
     image_height = total_text_height + 2 * padding + bottom_margin
 
-    # Crea la imagen con el alto calculado
     img = Image.new('RGBA', (video_width, image_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
 
-    # Calcula la posición Y para la primera línea, para centrar el bloque de texto verticalmente dentro del área disponible
-    y = padding  # Comienza desde el padding superior
+    # Calcula el ancho máximo de todas las líneas (para centrar el rectángulo)
+    max_line_width = 0
+    for line in lines:
+        left, top, right, bottom = draw.textbbox((0, 0), line, font=font)
+        max_line_width = max(max_line_width, right - left)
 
+    # Calcula las coordenadas del rectángulo de fondo
+    rect_x0 = (video_width - max_line_width) // 2 - padding
+    rect_y0 = padding  # Comienza desde el padding superior
+    rect_x1 = rect_x0 + max_line_width + 2 * padding
+    rect_y1 = image_height - bottom_margin - padding # Termina antes del margen inferior
+
+    # Dibuja el rectángulo de fondo *antes* de dibujar el texto
+    draw.rectangle((rect_x0, rect_y0, rect_x1, rect_y1), fill=bg_color)
+
+    # Dibuja el texto línea por línea
+    y = padding # Comienza desde el padding superior
     for line in lines:
         left, top, right, bottom = draw.textbbox((0, 0), line, font=font)
         x = (img.width - (right - left)) // 2
-
-        # Dibujar el rectángulo de fondo
-        rect_x0 = x - padding
-        rect_y0 = y - padding
-        rect_x1 = x + (right - left) + padding
-        rect_y1 = y + line_height - padding
-        draw.rectangle((rect_x0, rect_y0, rect_x1, rect_y1), fill=bg_color)
-
         draw.text((x, y), line, font=font, fill=text_color)
         y += line_height
 
     return np.array(img)
-
-
 
 # Función de creación de video (sin cambios)
 def create_simple_video(texto, nombre_salida, voz, background_video_path):
