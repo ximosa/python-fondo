@@ -30,7 +30,7 @@ VOCES_DISPONIBLES = {
 }
 
 # Función de creación de texto con fondo
-def create_text_image(text, video_width, font_size=30, line_height=50, bg_color=(0, 0, 0, 128), text_color="white", padding=10, bottom_margin=20):
+def create_text_image(text, video_width, font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white", padding=10, bottom_margin=20):
     """
     Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
 
@@ -47,39 +47,45 @@ def create_text_image(text, video_width, font_size=30, line_height=50, bg_color=
     Returns:
         Un array NumPy que representa la imagen.
     """
-    # Calcula un alto dinámico basado en la cantidad de líneas de texto
-    img = Image.new('RGBA', (video_width, line_height * (text.count('\n') + 1) + 2 * padding + bottom_margin), (0, 0, 0, 0)) # Ajuste dinámico del alto
+    # Envolver el texto para que quepa dentro del ancho del video
+    import textwrap
+    wrapped_text = textwrap.fill(text, width=60)  # Ajusta 'width' para controlar el ancho máximo del texto
+    lines = wrapped_text.split('\n')
+    num_lines = len(lines)
+
+    # Calcula la altura total requerida para el texto
+    total_text_height = num_lines * line_height
+
+    # Calcula la altura total de la imagen (incluyendo padding y margen inferior)
+    image_height = total_text_height + 2 * padding + bottom_margin
+
+    # Crea la imagen con el alto calculado
+    img = Image.new('RGBA', (video_width, image_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
 
-    # Envolver el texto para que quepa dentro del ancho del video
-    import textwrap
-    wrapped_text = textwrap.fill(text, width=60) # Ajusta 'width' para controlar el ancho máximo del texto
-    lines = wrapped_text.split('\n')
-
-    # Calcula la altura total del texto
-    total_height = len(lines) * line_height
-
-    # Posiciona el texto en la parte inferior, dejando un margen
-    y = img.height - total_height - padding - bottom_margin
+    # Calcula la posición Y para la primera línea, para centrar el bloque de texto verticalmente dentro del área disponible
+    y = padding  # Comienza desde el padding superior
 
     for line in lines:
         left, top, right, bottom = draw.textbbox((0, 0), line, font=font)
         x = (img.width - (right - left)) // 2
 
         # Dibujar el rectángulo de fondo
-        rect_x0 = x - padding  # Margen horizontal
-        rect_y0 = y - padding  # Margen vertical
+        rect_x0 = x - padding
+        rect_y0 = y - padding
         rect_x1 = x + (right - left) + padding
         rect_y1 = y + line_height - padding
         draw.rectangle((rect_x0, rect_y0, rect_x1, rect_y1), fill=bg_color)
 
         draw.text((x, y), line, font=font, fill=text_color)
         y += line_height
+
     return np.array(img)
 
 
-# Función de creación de video
+
+# Función de creación de video (sin cambios)
 def create_simple_video(texto, nombre_salida, voz, background_video_path):
     archivos_temp = []
     clips_audio = []
@@ -162,11 +168,11 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             duracion = audio_clip.duration
 
             # Usar la función create_text_image modificada
-            text_img = create_text_image(segmento, video_width=video_width) # Pasa el ancho del video
+            text_img = create_text_image(segmento, video_width=video_width)  # Pasa el ancho del video
             txt_clip = (ImageClip(text_img, transparent=True)
                         .set_start(tiempo_acumulado)
                         .set_duration(duracion)
-                        .set_pos(("center", "bottom"))) # Posicionamiento preciso
+                        .set_pos(("center", "bottom")))  # Posicionamiento preciso
 
             video_segment = txt_clip.set_audio(audio_clip.set_start(tiempo_acumulado))
             clips_finales.append(video_segment)
