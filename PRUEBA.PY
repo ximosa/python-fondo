@@ -30,7 +30,7 @@ VOCES_DISPONIBLES = {
 }
 
 # Función de creación de texto con fondo
-def create_text_image(text, size=(1280, 360), font_size=60, line_height=70, bg_color=(0, 0, 0, 128), text_color="white"):
+def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white"):
     img = Image.new('RGBA', size, (0, 0, 0, 0))  # Fondo totalmente transparente
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
@@ -77,7 +77,6 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
     message = ""
     temp_video_path = None
     background_clip = None
-    final_video = None # Inicializar final_video
 
     try:
         logging.info("Iniciando proceso de creación de video...")
@@ -85,7 +84,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         client = texttospeech.TextToSpeechClient()
 
         tiempo_acumulado = 0
-
+        
         # Agrupamos frases en segmentos
         segmentos_texto = []
         segmento_actual = ""
@@ -97,18 +96,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             segmento_actual = frase
         segmentos_texto.append(segmento_actual.strip())
 
-        # Cargar video de fondo
-        try:
-            logging.info(f"Intentando cargar video de fondo desde: {background_video_path}")
-            background_clip = VideoFileClip(background_video_path, audio=False)
-            logging.info("Video de fondo cargado exitosamente.")
-
-        except Exception as e:
-            message = f"Error al cargar/procesar el video de fondo: {e}"
-            logging.error(message)
-            return False, message, None
-
-        # Generar clips de audio y video para cada segmento
+        # Generar audio y calcular la duración total
         for i, segmento in enumerate(segmentos_texto):
             logging.info(f"Procesando segmento {i + 1} de {len(segmentos_texto)}")
 
@@ -152,13 +140,13 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             audio_clip = AudioFileClip(temp_filename)
             clips_audio.append(audio_clip)
             duracion = audio_clip.duration
-
+            
             text_img = create_text_image(segmento)
-            txt_clip = (ImageClip(text_img, transparent=True)
-                        .set_start(tiempo_acumulado)
-                        .set_duration(duracion)
-                        .set_position('center'))
-
+            txt_clip = (ImageClip(text_img, transparent=True)  #Hace el fondo transparente
+                      .set_start(tiempo_acumulado)
+                      .set_duration(duracion)
+                      .set_position('center'))
+            
             video_segment = txt_clip.set_audio(audio_clip.set_start(tiempo_acumulado))
             clips_finales.append(video_segment)
 
@@ -167,14 +155,20 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
 
         video_duration = tiempo_acumulado  # Duración total del video
 
-        # Repetir el video de fondo si es necesario
-        if background_clip.duration < video_duration:
-            num_loops = int(video_duration / background_clip.duration) + 1
-            background_clips = [background_clip] * num_loops
-            background_clip = concatenate_videoclips(background_clips, method="compose")
+        # Cargar video de fondo
+        try:
+            logging.info(f"Intentando cargar video de fondo desde: {background_video_path}")
+            background_clip = VideoFileClip(background_video_path, audio=False)
+            logging.info("Video de fondo cargado exitosamente.")
 
-        # Recortar el video de fondo a la duración total
-        background_clip = background_clip.subclip(0, video_duration)
+            # Recortar el video de fondo solo si es más largo que la duración del texto
+            if background_clip.duration > video_duration:
+                background_clip = background_clip.subclip(0, video_duration)
+
+        except Exception as e:
+            message = f"Error al cargar/procesar el video de fondo: {e}"
+            logging.error(message)
+            return False, message, None
 
         # Superponer los clips de texto sobre el fondo
         final_video = concatenate_videoclips([background_clip] + clips_finales, method="compose")
@@ -218,7 +212,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             if background_clip:
                 background_clip.close()
             if final_video:
-                final_video.close()  # Asegúrate de cerrar final_video
+                final_video.close()
         except:
             pass
 
