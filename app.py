@@ -30,47 +30,42 @@ VOCES_DISPONIBLES = {
 }
 
 # Función de creación de texto con fondo
-def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_color=(0, 0, 0, 128), text_color="white", padding=10):
+def create_text_image(text, video_width, font_size=30, line_height=50, bg_color=(0, 0, 0, 128), text_color="white", padding=10, bottom_margin=20):
     """
-    Crea una imagen con texto y un fondo oscuro transparente.
+    Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
 
     Args:
         text: El texto a mostrar.
-        size: El tamaño de la imagen (ancho, alto).
+        video_width: Ancho del video de fondo.  Importante para el ancho de la imagen.
         font_size: El tamaño de la fuente.
         line_height: La altura de cada línea de texto.
         bg_color: El color de fondo en formato RGBA (rojo, verde, azul, alfa).
         text_color: El color del texto.
         padding: El padding alrededor del texto en píxeles.
+        bottom_margin: Margen desde la parte inferior del video.
 
     Returns:
         Un array NumPy que representa la imagen.
     """
-    img = Image.new('RGBA', size, (0, 0, 0, 0))  # Fondo totalmente transparente
+    # Calcula un alto dinámico basado en la cantidad de líneas de texto
+    img = Image.new('RGBA', (video_width, line_height * (text.count('\n') + 1) + 2 * padding + bottom_margin), (0, 0, 0, 0)) # Ajuste dinámico del alto
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
 
-    words = text.split()
-    lines = []
-    current_line = []
+    # Envolver el texto para que quepa dentro del ancho del video
+    import textwrap
+    wrapped_text = textwrap.fill(text, width=60) # Ajusta 'width' para controlar el ancho máximo del texto
+    lines = wrapped_text.split('\n')
 
-    for word in words:
-        current_line.append(word)
-        test_line = ' '.join(current_line)
-        left, top, right, bottom = draw.textbbox((0, 0), test_line, font=font)
-        if right > size[0] - (2 * padding):
-            current_line.pop()
-            lines.append(' '.join(current_line))
-            current_line = [word]
-    lines.append(' '.join(current_line))
-
+    # Calcula la altura total del texto
     total_height = len(lines) * line_height
-    # Calculate the starting Y position to place the text at the bottom
-    y = size[1] - total_height - (2 * padding) # Moves the text to the bottom
+
+    # Posiciona el texto en la parte inferior, dejando un margen
+    y = img.height - total_height - padding - bottom_margin
 
     for line in lines:
         left, top, right, bottom = draw.textbbox((0, 0), line, font=font)
-        x = (size[0] - (right - left)) // 2
+        x = (img.width - (right - left)) // 2
 
         # Dibujar el rectángulo de fondo
         rect_x0 = x - padding  # Margen horizontal
@@ -81,16 +76,16 @@ def create_text_image(text, size=(1280, 360), font_size=40, line_height=50, bg_c
 
         draw.text((x, y), line, font=font, fill=text_color)
         y += line_height
-
     return np.array(img)
+
 
 # Función de creación de video
 def create_simple_video(texto, nombre_salida, voz, background_video_path):
     archivos_temp = []
     clips_audio = []
     clips_finales = []
-    success = False  # Inicializa success
-    message = ""  # Inicializa message
+    success = False
+    message = ""
     temp_video_path = None
 
     try:
@@ -116,6 +111,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             logging.info(f"Intentando cargar video de fondo desde: {background_video_path}")
             background_clip = VideoFileClip(background_video_path, audio=False)
             logging.info("Video de fondo cargado exitosamente.")
+            video_width, video_height = background_clip.size # Obtener dimensiones del video
         except Exception as e:
             message = f"Error al cargar el video de fondo: {e}"
             logging.error(message)
@@ -166,11 +162,11 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             duracion = audio_clip.duration
 
             # Usar la función create_text_image modificada
-            text_img = create_text_image(segmento)
-            txt_clip = (ImageClip(text_img, transparent=True)  # Hace el fondo transparente
+            text_img = create_text_image(segmento, video_width=video_width) # Pasa el ancho del video
+            txt_clip = (ImageClip(text_img, transparent=True)
                         .set_start(tiempo_acumulado)
                         .set_duration(duracion)
-                        .set_position('bottom')) # Move the text to the bottom of the video
+                        .set_pos(("center", "bottom"))) # Posicionamiento preciso
 
             video_segment = txt_clip.set_audio(audio_clip.set_start(tiempo_acumulado))
             clips_finales.append(video_segment)
@@ -218,7 +214,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         logging.error(f"Error: {message}")
         success = False
 
-    finally:  # Asegura que los recursos se liberen incluso si hay errores
+    finally:
         for clip in clips_audio:
             try:
                 clip.close()
@@ -246,6 +242,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
                 pass
 
         return success, message, temp_video_path
+
 
 def main():
     st.title("Creador de Videos Automático")
@@ -283,14 +280,14 @@ def main():
                                     label="Descargar video",
                                     data=video_bytes,
                                     file_name=f"{nombre_salida}.mp4",
-                                    mime="video/mp4"  # Especifica el tipo MIME
+                                    mime="video/mp4"
                                 )
 
                             except Exception as e:
                                 st.error(f"Error al mostrar/descargar el video: {e}")
                             finally:
                                 if temp_video_path:
-                                    os.remove(temp_video_path)  # Elimina el archivo temporal después de mostrarlo/descargarlo
+                                    os.remove(temp_video_path)
                         else:
                             st.error(f"Error al generar video: {message}")
 
