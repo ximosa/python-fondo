@@ -29,9 +29,9 @@ VOCES_DISPONIBLES = {
     'es-ES-Standard-B': texttospeech.SsmlVoiceGender.MALE,
 }
 
-def create_text_image(text, video_width, font_size=35, line_height=40, bg_color=(0, 0, 0, 150), text_color="white", padding=8, bottom_margin=8):
+def create_text_image(text, video_width, font_size=38, line_height=40, bg_color=(0, 0, 0, 150), text_color="white", padding=8, bottom_margin=8):
     import textwrap
-    wrapped_text = textwrap.fill(text, width=80) # Reducido a 40
+    wrapped_text = textwrap.fill(text, width=90) # Reducido a 40
     lines = wrapped_text.split('\n')
     num_lines = len(lines)
 
