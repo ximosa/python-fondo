@@ -47,7 +47,7 @@ def create_text_image(text, video_width, video_height, font_size=None, line_heig
     if bottom_margin is None:
         bottom_margin = int(video_height * 0.02)  # 2% de la altura del video
 
-    wrapped_text = textwrap.fill(text, width=40)  # Ancho máximo de la línea
+    wrapped_text = textwrap.fill(text, width=80)  # Ancho máximo de la línea
     lines = wrapped_text.split('\n')
     num_lines = len(lines)
 
