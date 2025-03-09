@@ -29,14 +29,9 @@ VOCES_DISPONIBLES = {
     'es-ES-Standard-B': texttospeech.SsmlVoiceGender.MALE,
 }
 
-# Función de creación de texto con fondo
-def create_text_image(text, video_width, font_size=30, line_height=40, bg_color=(0, 0, 0, 150), text_color="white", padding=10, bottom_margin=20):
-    """
-    Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
-    El fondo ahora cubre todo el bloque de texto.
-    """
+def create_text_image(text, video_width, font_size=28, line_height=36, bg_color=(0, 0, 0, 150), text_color="white", padding=8, bottom_margin=8):
     import textwrap
-    wrapped_text = textwrap.fill(text, width=60)
+    wrapped_text = textwrap.fill(text, width=40) # Reducido a 40
     lines = wrapped_text.split('\n')
     num_lines = len(lines)
 
