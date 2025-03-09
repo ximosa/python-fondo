@@ -30,7 +30,7 @@ VOCES_DISPONIBLES = {
 }
 
 # Función de creación de texto con fondo
-def create_text_image(text, video_width, font_size=35, line_height=45, bg_color=(0, 0, 0, 128), text_color="white", padding=10, bottom_margin=20):
+def create_text_image(text, video_width, font_size=30, line_height=40, bg_color=(0, 0, 0, 150), text_color="white", padding=10, bottom_margin=20):
     """
     Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
     El fondo ahora cubre todo el bloque de texto.
