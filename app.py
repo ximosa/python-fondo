@@ -29,9 +29,24 @@ VOCES_DISPONIBLES = {
     'es-ES-Standard-B': texttospeech.SsmlVoiceGender.MALE,
 }
 
-def create_text_image(text, video_width, font_size=35, line_height=40, bg_color=(0, 0, 0, 150), text_color="white", padding=8, bottom_margin=8):
+def create_text_image(text, video_width, video_height, font_size=None, line_height=None, bg_color=(0, 0, 0, 150), text_color="white", padding=None, bottom_margin=None):
+    """
+    Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
+    El fondo ahora cubre todo el bloque de texto.
+    """
     import textwrap
-    wrapped_text = textwrap.fill(text, width=80) # Reducido a 40
+
+    # Define valores predeterminados basados en la resolución del video
+    if font_size is None:
+        font_size = int(video_height * 0.05)  # 5% de la altura del video
+    if line_height is None:
+        line_height = int(font_size * 1.2)  # 120% del tamaño de la fuente
+    if padding is None:
+        padding = int(video_height * 0.01)  # 1% de la altura del video
+    if bottom_margin is None:
+        bottom_margin = int(video_height * 0.02)  # 2% de la altura del video
+
+    wrapped_text = textwrap.fill(text, width=40) # Reducido a 40
     lines = wrapped_text.split('\n')
     num_lines = len(lines)
 
@@ -67,6 +82,9 @@ def create_text_image(text, video_width, font_size=35, line_height=40, bg_color=
         y += line_height
 
     return np.array(img)
+
+# En create_simple_video:
+text_img = create_text_image(segmento, video_width=video_width, video_height=video_height)
 
 # Función de creación de video (sin cambios)
 def create_simple_video(texto, nombre_salida, voz, background_video_path):
