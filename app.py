@@ -29,6 +29,7 @@ VOCES_DISPONIBLES = {
     'es-ES-Standard-B': texttospeech.SsmlVoiceGender.MALE,
 }
 
+# Función de creación de texto con fondo
 def create_text_image(text, video_width, video_height, font_size=None, line_height=None, bg_color=(0, 0, 0, 150), text_color="white", padding=None, bottom_margin=None):
     """
     Crea una imagen con texto y un fondo oscuro transparente, optimizada para la parte inferior del video.
@@ -46,7 +47,7 @@ def create_text_image(text, video_width, video_height, font_size=None, line_heig
     if bottom_margin is None:
         bottom_margin = int(video_height * 0.02)  # 2% de la altura del video
 
-    wrapped_text = textwrap.fill(text, width=40) # Reducido a 40
+    wrapped_text = textwrap.fill(text, width=40)  # Ancho máximo de la línea
     lines = wrapped_text.split('\n')
     num_lines = len(lines)
 
@@ -83,10 +84,7 @@ def create_text_image(text, video_width, video_height, font_size=None, line_heig
 
     return np.array(img)
 
-# En create_simple_video:
-text_img = create_text_image(segmento, video_width=video_width, video_height=video_height)
-
-# Función de creación de video (sin cambios)
+# Función de creación de video (sin cambios significativos, solo llamada a create_text_image modificada)
 def create_simple_video(texto, nombre_salida, voz, background_video_path):
     archivos_temp = []
     clips_audio = []
@@ -106,7 +104,7 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
         segmentos_texto = []
         segmento_actual = ""
         for frase in frases:
-            if len(segmento_actual) + len(frase) < 300:
+            if len(segmento_actual) + len(frase) < 250:  # Reducido a 250
                 segmento_actual += " " + frase
             else:
                 segmentos_texto.append(segmento_actual.strip())
@@ -118,7 +116,8 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             logging.info(f"Intentando cargar video de fondo desde: {background_video_path}")
             background_clip = VideoFileClip(background_video_path, audio=False)
             logging.info("Video de fondo cargado exitosamente.")
-            video_width, video_height = background_clip.size # Obtener dimensiones del video
+            video_width, video_height = background_clip.size  # Obtener dimensiones del video
+            logging.info(f"Ancho del video: {video_width}, Alto del video: {video_height}") # Imprime la resolución
         except Exception as e:
             message = f"Error al cargar el video de fondo: {e}"
             logging.error(message)
@@ -168,12 +167,12 @@ def create_simple_video(texto, nombre_salida, voz, background_video_path):
             clips_audio.append(audio_clip)
             duracion = audio_clip.duration
 
-            # Usar la función create_text_image modificada
-            text_img = create_text_image(segmento, video_width=video_width)  # Pasa el ancho del video
+            # Usar la función create_text_image modificada, pasando video_width y video_height
+            text_img = create_text_image(segmento, video_width=video_width, video_height=video_height)
             txt_clip = (ImageClip(text_img, transparent=True)
                         .set_start(tiempo_acumulado)
                         .set_duration(duracion)
-                        .set_pos(("center", "bottom")))  # Posicionamiento preciso
+                        .set_pos(("center", "bottom")))
 
             video_segment = txt_clip.set_audio(audio_clip.set_start(tiempo_acumulado))
             clips_finales.append(video_segment)
